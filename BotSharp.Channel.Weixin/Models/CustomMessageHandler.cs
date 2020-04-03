@@ -112,21 +112,22 @@ namespace BotSharp.Channel.Weixin.Models
             };
         }
 
-        public override void OnExecuting()
-        {
-            //测试MessageContext.StorageData
-            if (CurrentMessageContext.StorageData == null)
-            {
-                CurrentMessageContext.StorageData = 0;
-            }
-            base.OnExecuting();
-        }
+       
+        //public override void OnExecuting()
+        //{
+        //    //测试MessageContext.StorageData
+        //    if (CurrentMessageContext.StorageData == null)
+        //    {
+        //        CurrentMessageContext.StorageData = 0;
+        //    }
+        //    base.OnExecuting();
+        //}
 
-        public override void OnExecuted()
-        {
-            base.OnExecuted();
-            CurrentMessageContext.StorageData = ((int)CurrentMessageContext.StorageData) + 1;
-        }
+        //public override void OnExecuted()
+        //{
+        //    base.OnExecuted();
+        //    CurrentMessageContext.StorageData = ((int)CurrentMessageContext.StorageData) + 1;
+        //}
 
         /// <summary>
         /// 处理文字请求

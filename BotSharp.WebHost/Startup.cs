@@ -4,14 +4,14 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json.Serialization;
-using Swashbuckle.AspNetCore.Swagger;
+using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerUI;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Text.Json.Serialization;
+
 
 namespace BotSharp.WebHost
 {
@@ -29,6 +29,8 @@ namespace BotSharp.WebHost
 
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddControllersWithViews();
+
             services.AddCors(options =>
             {
                 options.AddPolicy("AllowAllHeaders", builder =>
@@ -46,8 +48,8 @@ namespace BotSharp.WebHost
                 options.RespectBrowserAcceptHeader = true;
             }).AddJsonOptions(options =>
             {
-                options.SerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());
-                options.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+                options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+                options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
             });
 
             //PlatformModuleAssembyLoader.LoadAssemblies(Configuration, assembly => mvcBuilder.AddApplicationPart(assembly));
@@ -56,25 +58,47 @@ namespace BotSharp.WebHost
 
             services.AddSwaggerGen(c =>
             {
-                c.AddSecurityDefinition("Bearer", new ApiKeyScheme()
+
+                c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
                 {
-                    In = "header",
-                    Description = "Please insert JWT with Bearer schema. Example: \"Authorization: Bearer {token}\"",
+                    Description =
+                      "JWT Authorization header using the Bearer scheme. \r\n\r\n Enter 'Bearer' [space] and then your token in the text input below.\r\n\r\nExample: \"Bearer 12345abcdef\"",
                     Name = "Authorization",
-                    Type = "apiKey"
+                    In = ParameterLocation.Header,
+                    Type = SecuritySchemeType.ApiKey,
+                    Scheme = "Bearer"
                 });
 
-                c.AddSecurityRequirement(new Dictionary<string, IEnumerable<string>> {
-                  { "Bearer", Enumerable.Empty<string>() },
+                c.AddSecurityRequirement(new OpenApiSecurityRequirement()
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            },
+                            Scheme = "oauth2",
+                            Name = "Bearer",
+                            In = ParameterLocation.Header,
+
+                        },
+                        new List<string>()
+                    }
                 });
 
-                var info = Configuration.GetSection("Swagger").Get<Info>();
-                c.SwaggerDoc(info.Version, info);
+                var info = Configuration.GetSection("Swagger").Get<Swagger>();
+                c.SwaggerDoc(info.Version, new OpenApiInfo
+                {
+                    Version = info.Version,
+                    Description = info.Description,
+                    Title = info.Title,
+                    TermsOfService = new System.Uri(info.TermsOfService),
+                    License = new OpenApiLicense { Name = info.License.Name, Url = new System.Uri(info.License.Url) },
+                    Contact = new OpenApiContact { Name = info.Contact.Name, Url = new System.Uri(info.Contact.Url), Email = info.Contact.Email },
+                });
 
-                //var filePath = Path.Combine(PlatformServices.Default.Application.ApplicationBasePath, "BotSharp.RestApi.xml");
-                //c.IncludeXmlComments(filePath);
-
-                c.OperationFilter<SwaggerFileUploadOperation>();
             });
 
             // register platform dependency
@@ -90,16 +114,19 @@ namespace BotSharp.WebHost
             {
                 app.UseDeveloperExceptionPage();
             }
+            app.UseStaticFiles();
 
+            app.UseRouting();
             app.UseCors("AllowAllHeaders");
 
             app.UseDefaultFiles();
-            app.UseStaticFiles();
 
+            // Enable middleware to serve generated Swagger as a JSON endpoint.
             app.UseSwagger();
+
             app.UseSwaggerUI(c =>
             {
-                var info = Configuration.GetSection("Swagger").Get<Info>();
+                var info = Configuration.GetSection("Swagger").Get<Swagger>();
 
                 c.SupportedSubmitMethods(SubmitMethod.Get, SubmitMethod.Post, SubmitMethod.Put, SubmitMethod.Patch, SubmitMethod.Delete);
                 c.ShowExtensions();
@@ -128,9 +155,14 @@ namespace BotSharp.WebHost
 
                 await next.Invoke();
             });
-            app.UseAuthentication();
 
-            app.UseMvc();
+            app.UseAuthentication();
+            app.UseAuthorization();
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllers();
+            });
+
 
             this.modulesStartup.Configure(app, env);
 
@@ -145,4 +177,36 @@ namespace BotSharp.WebHost
             loader.Load();*/
         }
     }
+
+
+    public class SwaggerInfo
+    {
+        public Swagger Swagger { get; set; }
+    }
+
+    public class Swagger
+    {
+        public Contact Contact { get; set; }
+        public string Description { get; set; }
+        public string Endpoint { get; set; }
+        public License License { get; set; }
+        public string TermsOfService { get; set; }
+        public string Title { get; set; }
+        public string Version { get; set; }
+        public string Stylesheet { get; set; }
+    }
+
+    public class Contact
+    {
+        public string Email { get; set; }
+        public string Name { get; set; }
+        public string Url { get; set; }
+    }
+
+    public class License
+    {
+        public string Name { get; set; }
+        public string Url { get; set; }
+    }
+
 }
